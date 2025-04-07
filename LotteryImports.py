@@ -137,7 +137,6 @@ def create_donation_embed(user, amount, pool):
     embed.set_footer(text="Lottery System")
     return embed
 
-
 async def update_pool_channel(pool: str, amount: int, data: dict):
     if "update_channels" not in data or pool not in data["update_channels"]:
         return
