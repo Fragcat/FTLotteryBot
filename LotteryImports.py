@@ -124,6 +124,7 @@ VERIFIED_USERS_FILE_PATH = pathlib.Path('verified_users.json')
 # Load environment variables
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+
 LOTTERY_DATA_FILE = "lottery_data.json"
 
 # Create embed message for donations
