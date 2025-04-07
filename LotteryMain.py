@@ -1,4 +1,3 @@
-from enum import member
 import asyncio
 from aiohttp.hdrs import SERVER
 import discord
