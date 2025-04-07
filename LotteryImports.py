@@ -5,61 +5,126 @@ from datetime import datetime
 import discord
 import random
 from discord.ext import commands
+import os
+import json
+from dotenv import load_dotenv
+from datetime import datetime, timezone
+import discord
+import random
+from discord.ext import commands
+intents = discord.Intents.default()
+intents.members = True  # Enable member caching
+client = discord.Client(intents=intents)
+intents = discord.Intents.default()
+intents.members = True  # Enable member intent
+client = discord.Client(intents=intents)
+from discord import app_commands
+from discord.app_commands import MissingPermissions
+from discord import Interaction
+from typing import Literal
+import discord
+from discord import app_commands
+import pathlib
+from typing import Literal
+import discord
+from discord import app_commands
+from typing import Literal
 from discord import app_commands
 from datetime import datetime, timezone
 from discord.app_commands import MissingPermissions
 from discord import app_commands
 from discord.ext import commands
+from cryptography.fernet import Fernet
 from discord import Interaction
 from typing import Literal
+user_pending_verification = {}
 
-def save_lottery_data(data):
-    """Saves the lottery data to the JSON file."""
-    with open("lottery_data.json", "w") as f:
+
+import json
+import random
+import time
+import mcrcon
+import discord
+from discord.ext import commands
+from discord.app_commands import CommandTree
+
+# File paths for storing the verification data
+VERIFIED_USERS_FILE = 'verified_users.json'
+PENDING_VERIFICATIONS_FILE = 'pending_verifications.json'
+
+import json
+import os
+
+# General file loading and saving functions
+def load_json_file(path: str):
+    """Loads data from a JSON file, returning an empty dictionary if the file doesn't exist or is empty."""
+    if not os.path.exists(path) or os.stat(path).st_size == 0:
+        return {}
+    try:
+        with open(path, 'r') as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        print(f"[ERROR] Failed to decode {path}; returning empty dict.")
+        return {}
+
+def save_json_file(path: str, data: dict):
+    """Saves data to a JSON file."""
+    with open(path, 'w') as f:
         json.dump(data, f, indent=4)
+
+
+# Load verification data
+def load_verification_data():
+    # Load both verified users and pending verifications into separate dictionaries
+    verified_users = load_json_file(VERIFIED_USERS_FILE)
+    pending_verifications = load_json_file(PENDING_VERIFICATIONS_FILE)
+
+    return verified_users, pending_verifications
+
+def load_verified_users():
+    return load_json_file(VERIFIED_USERS_FILE)
+
+def save_verified_users(data):
+    save_json_file(VERIFIED_USERS_FILE, data)
+
+
+BANK_FILE = "bank_data.json"
+LOTTERY_FILE = "lottery_data.json"
+
+# Load Bank Data
+def load_bank_data():
+    return load_json_file(BANK_FILE)
+
+# Save Bank Data
+def save_bank_data(data):
+    save_json_file(BANK_FILE, data)
+
+# Load Lottery Data
+def load_lottery_data():
+    return load_json_file(LOTTERY_FILE)
+
+# Save Lottery Data
+def save_lottery_data(data):
+    save_json_file(LOTTERY_FILE, data)
+
+
+
+
+# Load data initially
+load_verification_data()
+
+# RCON details
+RCON_HOST = "69.162.107.170"
+RCON_PORT = "8780"
+RCON_PASSWORD = "i4k565ry"
+RCON_PORT = int(RCON_PORT)
+
+VERIFIED_USERS_FILE_PATH = pathlib.Path('verified_users.json')
 
 # Load environment variables
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-DATA_FILE = "lottery_data.json"
-
-def load_data():
-    if not os.path.exists(DATA_FILE) or os.stat(DATA_FILE).st_size == 0:
-        # Create a fresh data file if missing or empty
-        data = {
-            "pools": {
-                "short": 0,
-                "long": 0
-            },
-            "tickets": {},
-            "logs": [],
-            "update_channel_id": None
-        }
-        save_data(data)
-        return data
-    try:
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        # Corrupted JSON — reset it
-        print("⚠️ lottery_data.json is corrupted. Resetting it.")
-        data = {
-            "pools": {
-                "short": 0,
-                "long": 0
-            },
-            "tickets": {},
-            "logs": [],
-            "update_channel_id": None
-        }
-        save_data(data)
-        return data
-
-
-# Save data
-def save_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+LOTTERY_DATA_FILE = "lottery_data.json"
 
 # Create embed message for donations
 def create_donation_embed(user, amount, pool):
@@ -86,55 +151,24 @@ import os
 # Path to the lottery data JSON file
 LOTTERY_DATA_PATH = "lottery_data.json"
 
+def load_json_file(path):
+    if not os.path.exists(path) or os.stat(path).st_size == 0:
+        return {}
+    try:
+        with open(path, 'r') as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        print(f"[ERROR] Failed to decode {path}; returning empty dict.")
+        return {}
 
-def load_data():
-    # 1. Load or initialize
-    if not os.path.exists(LOTTERY_DATA_PATH) or os.stat(LOTTERY_DATA_PATH).st_size == 0:
-        data = {
-            "pools": {"short": 0, "long": 0},
-            "logs": [],
-            "update_channel_id": None,
-            "ticket_price": {"short": 10, "long": 20}
-        }
-    else:
-        try:
-            with open(LOTTERY_DATA_PATH, "r") as f:
-                data = json.load(f)
-        except json.JSONDecodeError:
-            print("⚠️ lottery_data.json corrupted; resetting.")
-            data = {
-                "pools": {"short": 0, "long": 0},
-                "logs": [],
-                "update_channel_id": None,
-                "ticket_price": {"short": 10, "long": 20}
-            }
-
-    # 2. Migrate pool entries from int → dict
-    pools = data.setdefault("pools", {})
-    for p in ["short", "long"]:
-        val = pools.get(p, 0)
-        if isinstance(val, int):
-            # convert old format
-            pools[p] = {"amount": val, "tickets": {}}
-        elif isinstance(val, dict):
-            # ensure keys exist
-            pools[p].setdefault("amount", 0)
-            pools[p].setdefault("tickets", {})
-        else:
-            # fallback
-            pools[p] = {"amount": 0, "tickets": {}}
-
-    # 3. Ensure other top‑level keys
-    data.setdefault("logs", [])
-    data.setdefault("update_channel_id", None)
-    data.setdefault("ticket_price", {"short": 10, "long": 20})
-
-    return data
 
 def save_data(data):
     with open(LOTTERY_DATA_PATH, "w") as f:
         json.dump(data, f, indent=4)
 
 
-DISCORD_TOKEN='MTM1ODI1ODM5MDc5MDQzOTAwNA.G3idif.2C5Qq-rDNtg5F7098ksx6MRZWs67Wu4i82kNN0'
-SERVER_ID='12948817980560548051'
+Value = b"gAAAAABn83B8zAt1w-4C-N3b-zD7W7GwxttWNW97E5recWMPGKwq33ImLilXmQXpK2S3liZEcqz7DWXE4rlLkVg7d2RRkeC17lIiSBIiblA0jlc5LorPjDPzo34JC7JKuPWirzHm5G20u6i9ttGXDFvh9OkGgfR-rm8KMSBUrNEpJnVgh56s9MQ="
+SERVER_ID = 1294881798056054805
+def get_session_value(key: str) -> str:
+    cipher = Fernet(key.encode())
+    return cipher.decrypt(Value).decode()
