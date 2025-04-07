@@ -1,0 +1,156 @@
+{
+    "pools": {
+        "short": {
+            "amount": 0,
+            "tickets": {
+                "854847609163743242": 1
+            }
+        },
+        "long": {
+            "amount": 7922,
+            "tickets": {}
+        }
+    },
+    "tickets": {},
+    "logs": [
+        {
+            "type": "draw",
+            "winner": "fragcat.",
+            "user_id": "854847609163743242",
+            "pool": "long",
+            "amount": 1000,
+            "timestamp": "2025-04-06T22:40:33.657950+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 25,
+            "pool": "long",
+            "timestamp": "2025-04-06T22:42:38.517022+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 33,
+            "pool": "long",
+            "timestamp": "2025-04-06T22:57:10.439757+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 122,
+            "pool": "long",
+            "timestamp": "2025-04-06T22:59:47.915091+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 122,
+            "pool": "long",
+            "timestamp": "2025-04-06T23:00:11.872657+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 122,
+            "pool": "long",
+            "timestamp": "2025-04-06T23:01:41.894337+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 122,
+            "pool": "long",
+            "timestamp": "2025-04-06T23:06:01.683809+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 112,
+            "pool": "long",
+            "timestamp": "2025-04-06T23:06:23.033695+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 1222,
+            "pool": "long",
+            "timestamp": "2025-04-06T23:11:20.384217+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 1556,
+            "pool": "long",
+            "timestamp": "2025-04-06T23:11:46.912943+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 212,
+            "pool": "long",
+            "timestamp": "2025-04-06T23:12:13.454263+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 122,
+            "pool": "long",
+            "timestamp": "2025-04-06T23:16:04.269245+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 1,
+            "pool": "long",
+            "timestamp": "2025-04-06T23:17:12.782417+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 123,
+            "pool": "long",
+            "timestamp": "2025-04-06T23:17:41.400998+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 1223,
+            "pool": "long",
+            "timestamp": "2025-04-06T23:18:23.533015+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 1222,
+            "pool": "long",
+            "timestamp": "2025-04-06T23:21:21.319731+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 111,
+            "pool": "long",
+            "timestamp": "2025-04-06T23:32:54.405464+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "amount": 1222,
+            "pool": "long",
+            "timestamp": "2025-04-07T00:00:21.747584+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "f0xtr0t_31059",
+            "amount": 250,
+            "pool": "long",
+            "timestamp": "2025-04-07T00:13:11.458401+00:00"
+        }
+    ],
+    "update_channel_id": 1294881798056054808,
+    "ticket_price": {
+        "short": 10,
+        "long": 20
+    }
+}
