@@ -114,9 +114,9 @@ def save_lottery_data(data):
 load_verification_data()
 
 # RCON details
-RCON_HOST = "69.162.107.170"
-RCON_PORT = "8780"
-RCON_PASSWORD = "i4k565ry"
+RCON_HOST = "172.96.172.164"
+RCON_PORT = "25028"
+RCON_PASSWORD = "ppBQWU2ksCcHS4L2W"
 RCON_PORT = int(RCON_PORT)
 
 VERIFIED_USERS_FILE_PATH = pathlib.Path('verified_users.json')

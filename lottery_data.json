@@ -1,0 +1,16 @@
+{
+    "ticket_price": {
+        "short": 5000,
+        "long": 10000
+    },
+    "pools": {
+        "short": {
+            "amount": 0,
+            "tickets": {}
+        },
+        "long": {
+            "amount": 0,
+            "tickets": {}
+        }
+    }
+}

@@ -2,14 +2,24 @@ import asyncio
 from aiohttp.hdrs import SERVER
 import discord
 from datetime import datetime
+import re
 import mcrcon
+VERIFIED_USERS_FILE_PATH = ('verified_users.json')
+
+def load_verified_users():
+    """Load verified users from a JSON file."""
+    if VERIFIED_USERS_FILE_PATH.exists():
+        with open(VERIFIED_USERS_FILE_PATH, 'r') as f:
+            return json.load(f)
+    return {}
+
 
 
 # Set up intents
 intents = discord.Intents.default()
 intents.members = True  # Enable member intent
 
-GUILD_ID = 1294881798056054805  # Your actual guild ID
+GUILD_ID = 1107774033107361904  # Your actual guild ID
 USER_ID = 854847609163743242   # The test user's ID
 amount = 25
 
@@ -25,7 +35,6 @@ from LotteryImports import *
 from LotteryImports import load_json_file, save_json_file, SERVER_ID, get_session_value
 import datetime, os, discord
 from discord.ext import tasks
-from invoice import create_invoice_link
 
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
@@ -88,7 +97,7 @@ async def on_ready():
     print(f"Logged into Lottery Client as {client.user}")
 
     # Start the task loop
-    send_monthly_invoice.start()
+
     print("[Startup] Invoice task started. Will only send on the 8th of each month.")
 
     # Try to fetch the user and confirm
@@ -109,64 +118,79 @@ def execute_rcon_command(command):
         print(f"[DEBUG] Failed to execute RCON command: {e}")
         return None  # Explicitly return None on failure
 
-
-
 @tree.command(name="bankdeposit", description="Deposit your in-game marks into your bank account.")
 @discord.app_commands.describe(amount="Amount of marks you want to deposit.")
 async def bankdeposit(interaction: discord.Interaction, amount: int):
-    await interaction.response.defer(ephemeral=True)
+    await interaction.response.defer(ephemeral=False)
 
     user_id = str(interaction.user.id)
     bank_data = load_json_file(BANK_FILE)
     verified_users = load_json_file(VERIFIED_USERS_FILE)
+
     if user_id not in verified_users:
-        await interaction.followup.send("❌ You must verify your account using `/link` before using the bank.", ephemeral=True)
+        await interaction.followup.send("❌ You must verify your account using `/link` before using the bank.", ephemeral=False)
         return
 
     ign = verified_users[user_id]
-    response = execute_rcon_command(f"setmarks {ign} 0")
 
-    if response is None:
-        await interaction.followup.send("❌ Failed to connect to the game server. Try again later.", ephemeral=True)
+    # Get current in-game marks
+    response = execute_rcon_command(f"playerinfo {ign}")
+    if not response or "Marks:" not in response:
+        await interaction.followup.send("❌ Failed to retrieve your marks. Make sure you're online in-game.", ephemeral=False)
         return
+
+    try:
+        match = re.search(r"Marks:\s*(\d+)", response)
+        if not match:
+            raise ValueError("Marks not found")
+        current_marks = int(match.group(1))
+    except (IndexError, ValueError):
+        await interaction.followup.send("❌ Could not parse your current marks from the server response.",
+                                        ephemeral=False)
+        return
+
+    new_marks = current_marks - amount
+    execute_rcon_command(f"setmarks {ign} {new_marks}")
 
     # Update bank balance
     bank_data.setdefault(user_id, 0)
     bank_data[user_id] += amount
     save_data(BANK_FILE, bank_data)
 
-    execute_rcon_command(f"setmarks {ign} 0")
-    await interaction.followup.send(f"✅ Successfully deposited **{amount:,}** marks into your bank account.", ephemeral=True)
-
+    await interaction.followup.send(f"✅ Successfully deposited **{amount:,}** marks into your bank account.\n💰 Remaining in-game marks: **{new_marks:,}**", ephemeral=False)
 
 
 @tree.command(name="bankwithdraw", description="Withdraw marks from your bank into the game.")
 @discord.app_commands.describe(amount="Amount of marks you want to withdraw.")
 async def bankwithdraw(interaction: discord.Interaction, amount: int):
-    await interaction.response.defer(ephemeral=True)
+    await interaction.response.defer(ephemeral=False)
 
     user_id = str(interaction.user.id)
     verified_users = load_json_file(VERIFIED_USERS_FILE)
     bank_data = load_json_file(BANK_FILE)
     if user_id not in verified_users:
-        await interaction.followup.send("❌ You must verify your account using `/link` before using the bank.", ephemeral=True)
+        await interaction.followup.send("❌ You must verify your account using `/link` before using the bank.", ephemeral=False)
         return
 
     ign = verified_users[user_id]
 
     if user_id not in bank_data or bank_data[user_id] < amount:
-        await interaction.followup.send("❌ You don’t have enough funds in your bank account.", ephemeral=True)
+        await interaction.followup.send("❌ You don’t have enough funds in your bank account.", ephemeral=False)
         return
 
     response = execute_rcon_command(f"playerinfo {ign}")
     if not response or "Marks:" not in response:
-        await interaction.followup.send("❌ Failed to get player info. Make sure you're online in-game.", ephemeral=True)
+        await interaction.followup.send("❌ Failed to get player info. Make sure you're online in-game.", ephemeral=False)
         return
 
     try:
-        current_marks = int(response.split("Marks:")[1].split("//")[0].strip())
+        match = re.search(r"Marks:\s*(\d+)", response)
+        if not match:
+            raise ValueError("Marks not found")
+        current_marks = int(match.group(1))
     except (IndexError, ValueError):
-        await interaction.followup.send("❌ Could not parse your current marks from the server response.", ephemeral=True)
+        await interaction.followup.send("❌ Failed to get player info. Make sure you're online in-game.",
+                                        ephemeral=False)
         return
 
     new_total = current_marks + amount
@@ -175,71 +199,144 @@ async def bankwithdraw(interaction: discord.Interaction, amount: int):
     bank_data[user_id] -= amount
     save_data(BANK_FILE, bank_data)
 
-    await interaction.followup.send(f"✅ Withdrawn **{amount:,}** marks to your in-game account.", ephemeral=True)
+    await interaction.followup.send(f"✅ Withdrawn **{amount:,}** marks to your in-game account.", ephemeral=False)
 
 
-
-@tree.command(name="bankbalance", description="Check your bank currency balance.")
+@tree.command(name="bankbalance", description="Check your bank marks balance.")
 async def bankbalance(interaction: discord.Interaction):
     user_id = str(interaction.user.id)
     bank_data = load_json_file(BANK_FILE)
     verified_users = load_json_file(VERIFIED_USERS_FILE)
+
     if user_id not in verified_users:
-        await interaction.response.send_message("❌ You must verify your account using `/link` before using the bank.", ephemeral=True)
+        await interaction.response.send_message("❌ You must verify your account using `/link` before using the bank.",
+                                                ephemeral=False)
         return
 
     balance = bank_data.get(user_id, 0)
-    await interaction.response.send_message(f"💼 Your bank balance is **{balance:,}** marks.", ephemeral=True)
+
+    # Generate a random color
+    random_color = discord.Color(random.randint(0, 0xFFFFFF))
+
+    # Create the embed message
+    embed = discord.Embed(
+        title="Bank Balance",
+        description=f"Your current balance is **{balance:,}** marks.",
+        color=random_color
+    )
+    embed.set_footer(text="Check your balance anytime!")
+
+    # Send the embed
+    await interaction.response.send_message(embed=embed, ephemeral=False)
+
+
+# File paths for storing the verification data
+VERIFIED_USERS_FILE = 'verified_users.json'
+PENDING_VERIFICATIONS_FILE = 'pending_verifications.json'
+
+
+# Load data from a JSON file
+def load_data(file_path):
+    try:
+        with open(file_path, 'r') as file:
+            return json.load(file)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+# Save data to a JSON file
+def save_data(file_path, data):
+    with open(file_path, 'w') as file:
+        json.dump(data, file, indent=4)
+
+
+# Load verification data
+def load_verification_data():
+    global verified_users, user_pending_verification
+    verified_users.update(load_data(VERIFIED_USERS_FILE))
+    user_pending_verification.update(load_data(PENDING_VERIFICATIONS_FILE))
+
+import json
+
+# File path for the verified users data
+VERIFIED_USERS_FILE = "verified_users.json"
+
+def save_verified_users():
+    try:
+        with open(VERIFIED_USERS_FILE, 'w') as f:
+            json.dump(verified_users, f, indent=4)
+        print("[DEBUG] Verified users saved to 'verified_users.json'.")
+    except Exception as e:
+        print(f"[ERROR] Failed to save verified users: {e}")
+
+
+
+# Save verification data
+def save_verification_data():
+    save_data(VERIFIED_USERS_FILE, verified_users)
+    save_data(PENDING_VERIFICATIONS_FILE, user_pending_verification)
+
+# Initialize verification data structures
+verified_users = {}
+user_pending_verification = {}
+
+# Load data initially
+load_verification_data()
+
+# To store current code and expiration time
+verification_code = ""
+verification_code_expiration = 0
+
 
 def generate_verification_code():
     global verification_code, verification_code_expiration
     verification_code = str(random.randint(100000, 999999))
     verification_code_expiration = time.time() + 180  # 3 minutes expiration time
 
-# To store current code and expiration time
-verification_code = ""
-verification_code_expiration = 0
 
 @tree.command(
     name='link',
     description='Links your discord account to your in-game username and verifies you in our discord server',
 )
 @discord.app_commands.describe(
-    ign="Your username or alderon-ID exactly as it appears in-game. e.g 'Fragcatt' or '308-364-016'."
+    ign="Your username or alderon-ID exactly as it appears in-game. e.g 'ehwzv' or '308-364-016'."
 )
 async def verify_command(interaction: discord.Interaction, ign: str):
-    verified_users = load_json_file(VERIFIED_USERS_FILE)
-    user_pending_verification = load_json_file(PENDING_VERIFICATIONS_FILE)
+    global verification_code, verification_code_expiration, user_pending_verification, verified_users
 
     if interaction.user.id in verified_users:
         if verified_users[interaction.user.id] == ign:
-            await interaction.response.send_message("✅ You have already linked your account!", ephemeral=True)
+            await interaction.response.send_message("You have already linked your account!", ephemeral=False)
         else:
-            await interaction.response.send_message("❌ You have already verified a different in-game username.", ephemeral=True)
+            await interaction.response.send_message("You have already verified a different in-game username!",
+                                                    ephemeral=False)
         return
 
     linked_discord_id = next((user_id for user_id, linked_ign in verified_users.items() if linked_ign == ign), None)
     if linked_discord_id:
         if linked_discord_id == interaction.user.id:
-            await interaction.response.send_message("✅ You have already linked this in-game username!", ephemeral=True)
+            await interaction.response.send_message("You have already linked this in-game username!", ephemeral=False)
         else:
-            await interaction.response.send_message("❌ This in-game username is already linked to another Discord account.", ephemeral=True)
+            await interaction.response.send_message(
+                "This in-game username is already linked to another Discord account.", ephemeral=False)
         return
 
     if interaction.user.id in user_pending_verification:
         if user_pending_verification[interaction.user.id]['attempts'] == 1:
             user_pending_verification[interaction.user.id]['attempts'] += 1
-            save_json_file(PENDING_VERIFICATIONS_FILE, user_pending_verification)
             await interaction.response.send_message(
-                "🔁 You already requested a verification code. Please use `/linkcode` to enter it.\n\n*Didn’t receive it? Re-run this command once more to regenerate.*",
-                ephemeral=True
+                "You have already requested a verification code. Please use /linkcode along with the verification code you received. \n\n*If you didn't receive it, you can use this command again to generate a new code*.",
+                ephemeral=False
             )
+            save_verification_data()  # Save pending verifications
             return
         elif user_pending_verification[interaction.user.id]['attempts'] == 2:
             del user_pending_verification[interaction.user.id]
-            save_json_file(PENDING_VERIFICATIONS_FILE, user_pending_verification)
+            save_verification_data()  # Save pending verifications
 
     generate_verification_code()
+    user_pending_verification[interaction.user.id] = {'ign': ign, 'attempts': 1}
+    save_verification_data()  # Save pending verifications
 
     try:
         with mcrcon.MCRcon(RCON_HOST, RCON_PASSWORD, port=RCON_PORT) as rcon:
@@ -251,7 +348,7 @@ async def verify_command(interaction: discord.Interaction, ign: str):
         if "No player" in response:
             await interaction.response.send_message(
                 f"❌ No player with the name `{ign}` is currently online. Please double-check the spelling and try again.",
-                ephemeral=True
+                ephemeral=False
             )
             return
 
@@ -266,13 +363,14 @@ async def verify_command(interaction: discord.Interaction, ign: str):
 
         await interaction.response.send_message(
             f"✅ Verification code has been sent to **{ign}** in-game. Check System Chat.\n*This code will expire in 3 minutes.*",
-            ephemeral=True
+            ephemeral=False
         )
-
     except ConnectionRefusedError:
-        await interaction.response.send_message("❌ The server did not respond to the request.", ephemeral=True)
+        await interaction.response.send_message("The server did not respond to the request.", ephemeral=False)
     except mcrcon.MCRconException as e:
-        await interaction.response.send_message(f"❌ An error occurred while sending the verification code: {e}", ephemeral=True)
+        await interaction.response.send_message(f"An error occurred while sending the verification code: {e}",
+                                                ephemeral=False)
+
 
 @tree.command(
     name='linkcode',
@@ -282,91 +380,110 @@ async def verify_command(interaction: discord.Interaction, ign: str):
     code="The verification code you should have received in-game."
 )
 async def verify_code_command(interaction: discord.Interaction, code: str):
-    verified_users = load_json_file(VERIFIED_USERS_FILE)
-    user_pending_verification = load_json_file(PENDING_VERIFICATIONS_FILE)
+    global verification_code, verification_code_expiration, user_pending_verification, verified_users
 
-    entry = user_pending_verification.get(interaction.user.id)
-    if not entry:
-        await interaction.response.send_message("You have not requested a verification code.", ephemeral=True)
+    if interaction.user.id not in user_pending_verification:
+        await interaction.response.send_message("You have not requested a verification code.", ephemeral=False)
         return
 
-    if time.time() > entry.get('expires', 0):
+    if time.time() > verification_code_expiration:
         del user_pending_verification[interaction.user.id]
-        save_json_file(PENDING_VERIFICATIONS_FILE, user_pending_verification)
+        save_verification_data()  # Save pending verifications
         await interaction.response.send_message(
-            "The verification code has expired. Please use /link to request a new one.",
-            ephemeral=True
-        )
+            "The verification code has expired. Please use /link to request a new one.", ephemeral=False)
         return
 
-    if code == entry.get('code'):
-        verified_users[interaction.user.id] = entry['ign']
-        save_json_file(VERIFIED_USERS_FILE, verified_users)
-
+    if code == verification_code:
+        ign = user_pending_verification[interaction.user.id]['ign']
+        verified_users[interaction.user.id] = ign
+        save_verification_data()
         del user_pending_verification[interaction.user.id]
-        save_json_file(PENDING_VERIFICATIONS_FILE, user_pending_verification)
+        save_verification_data()  # Save both verified users and pending verifications
 
-        # Assign Verified role
+        # Assigning "Verified" role
         verified_role = discord.utils.get(interaction.guild.roles, name="Verified")
         if verified_role:
             await interaction.user.add_roles(verified_role)
 
+        # Execute the RCON command to promote the user
+        rcon_command = f"promote {ign} Member"
+        rcon_response = execute_rcon_command(rcon_command)
+        if rcon_response is not None:
+            print(f"[DEBUG] Executed RCON command: {rcon_command}, Response: {rcon_response}")
+
         await interaction.response.send_message(
-            f"✅ Successfully linked! Your in-game name `{entry['ign']}` is now linked to your Discord account.",
-            ephemeral=True
-        )
+            f"Successfully verified! Your in-game name {ign} is now also linked to your Discord account.", ephemeral=False)
     else:
-        await interaction.response.send_message("❌ Invalid verification code. Please try again.", ephemeral=True)
+        await interaction.response.send_message("Invalid verification code. Please try again.", ephemeral=False)
 
-
-
-
-@tree.command(name="lotterysetpot", description="Manually adjust the amount of a lottery pool.")
-@app_commands.describe(pool="Choose either the short or long lottery pool", amount="Amount to set the pool to")
+@tree.command(name="lotterysetpot", description="Set the lottery pool amount manually.")
+@app_commands.describe(pool="Choose the pool to modify", amount="The new pool amount")
 async def setpot(interaction: discord.Interaction, pool: Literal["short", "long"], amount: int):
-    # Check if the user is "fragcat." or has admin permissions
-    if interaction.user.name == "fragcat.":
-        pass
-    elif interaction.user.guild_permissions.administrator:
-        pass
-    else:
-        await interaction.response.send_message("🚫 You do not have permission to adjust the lottery pool.", ephemeral=False)
+    user_id = str(interaction.user.id)
+
+    # Allow 'fragcat.' users without admin perms, otherwise require admin
+    if not user_id.startswith("fragcat.") and not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("🚫 You must be an administrator to use this command.", ephemeral=False)
         return
 
-    # Load the existing data using the new function
-    data = load_json_file("bank_data.json")  # Assuming BANK_FILE is the path to the file.
+    data = load_data(LOTTERY_DATA_FILE)
 
-    # Check if the pool is valid
+    # Ensure the 'pools' key exists
+    if "pools" not in data:
+        data["pools"] = {
+            "short": {"amount": 0, "tickets": {}, "next_draw": None},
+            "long": {"amount": 0, "tickets": {}, "next_draw": None}
+        }
+
     if pool not in data["pools"]:
-        await interaction.response.send_message(f"🚫 Invalid pool name '{pool}'. Please choose 'short' or 'long'.", ephemeral=False)
+        await interaction.response.send_message("🚫 That lottery pool doesn't exist.", ephemeral=False)
         return
 
-    # Set the new pool amount
+    # Set the new amount
     data["pools"][pool]["amount"] = amount
+    save_data(LOTTERY_DATA_FILE, data)
 
-    # Save the updated data
-    save_data("bank_data.json", data)
+    # Try updating the voice channel name if one is set
+    voice_update_channels = data.get("voice_update_channels", {})
+    channel_id = voice_update_channels.get(pool)
 
-    # Trigger the update for the pool channel
-    await update_pool_channel(pool, data["pools"][pool]["amount"], data)
+    if channel_id:
+        channel = interaction.guild.get_channel(channel_id)
 
-    # Send confirmation message
-    await interaction.response.send_message(f"✅ The {pool} pool has been updated to {amount}.")
+        if channel:
+            try:
+                # Ensure the channel is a voice channel before renaming
+                if isinstance(channel, discord.VoiceChannel):
+                    await channel.edit(name=f"{pool} pool: {amount:,}")
+                    await interaction.response.send_message(f"✅ Set the `{pool}` pool amount to **{amount:,}** and updated the voice channel name.")
+                else:
+                    await interaction.response.send_message(f"🚫 The channel with ID {channel_id} is not a voice channel.")
+            except discord.Forbidden:
+                await interaction.response.send_message("⚠️ Couldn't update the channel name due to permission issues.")
+            except Exception as e:
+                await interaction.response.send_message(f"⚠️ Channel rename failed: {e}")
+        else:
+            await interaction.response.send_message(f"🚫 Channel with ID {channel_id} not found.")
+    else:
+        await interaction.response.send_message("🚫 No update channel is set for this pool.")
 
 
-@tree.command(name="lottery_donate", description="Donate currency to a lottery pool")
+
+@tree.command(name="lottery_donate", description="Donate marks to a lottery pool")
 @app_commands.describe(amount="The amount to donate.", pool="Choose either the short or long lottery pool to join.")
 async def donate(interaction: discord.Interaction, pool: Literal["short", "long"], amount: int):
     # Load existing data using the new function
-    data = load_json_file("bank_data.json")
+    data = load_json_file("lottery_data.json")
 
-    # Ensure the 'update_channels' section exists in the data
+    # Ensure 'pools' and 'update_channels' sections exist in the data
+    if 'pools' not in data:
+        data['pools'] = {'short': {'amount': 0}, 'long': {'amount': 0}}  # Initialize pools if missing
     if 'update_channels' not in data:
         data['update_channels'] = {}
 
-    # Check if the pool is valid
-    if pool not in ['short', 'long']:
-        await interaction.response.send_message(f"🚫 Invalid pool name '{pool}'. Please choose 'short' or 'long'.")
+    # Validate pool existence in data
+    if pool not in data["pools"]:
+        await interaction.response.send_message(f"🚫 Invalid pool name '{pool}'. Please choose 'short' or 'long'.", ephemeral=False)
         return
 
     # Load the user's bank data
@@ -377,7 +494,7 @@ async def donate(interaction: discord.Interaction, pool: Literal["short", "long"
     user_balance = bank_data.get(user_id, 0)
 
     if user_balance < amount:
-        await interaction.response.send_message(f"🚫 You don't have enough currency to donate {amount}.", ephemeral=True)
+        await interaction.response.send_message(f"🚫 You don't have enough marks to donate {amount}.", ephemeral=False)
         return
 
     # Deduct the donated amount from the player's bank balance
@@ -385,14 +502,8 @@ async def donate(interaction: discord.Interaction, pool: Literal["short", "long"
     save_data("bank_data.json", bank_data)
 
     # Update the pool amount
-    if pool not in data:
-        data[pool] = 0  # Initialize pool total if not already present
-
-    # Add the donated amount to the pool
-    data[pool] += amount
-
-    # Save the updated data back to the file
-    save_data("bank_data.json", data)
+    data["pools"][pool]["amount"] += amount
+    save_data("lottery_data.json", data)
 
     # Now update the relevant channel name
     if pool in data['update_channels']:
@@ -402,12 +513,24 @@ async def donate(interaction: discord.Interaction, pool: Literal["short", "long"
         if channel:
             try:
                 # Format the new channel name to include the pool total
-                new_channel_name = f"{pool} pool: {data[pool]}"
+                new_channel_name = f"{pool} pool: {data['pools'][pool]['amount']:,}"
 
                 # Rename the channel
                 await channel.edit(name=new_channel_name)
+
+                # Send embed to update the community
+                embed = discord.Embed(
+                    title="💸 New Lottery Donation!",
+                    description=f"**{interaction.user.display_name}** donated **{amount}** to the **{pool}** pool!",
+                    color=discord.Color.green()
+                )
+                embed.set_footer(text=f"Total in {pool} pool: {data['pools'][pool]['amount']:,}")
+                await channel.send(embed=embed)
+
+                # Acknowledge the donation
                 await interaction.response.send_message(
-                    f"✅ Thanks! You donated {amount} to the {pool} pool. The channel has been updated.")
+                    f"✅ Thanks! You donated {amount} to the {pool} pool."
+                )
             except discord.Forbidden:
                 await interaction.response.send_message("🚫 I do not have permission to rename this channel.")
             except discord.HTTPException as e:
@@ -417,27 +540,98 @@ async def donate(interaction: discord.Interaction, pool: Literal["short", "long"
         else:
             await interaction.response.send_message("🚫 The channel for this pool could not be found.")
     else:
-        await interaction.response.send_message(f"🚫 No update channel set for the {pool} pool.")
+        await interaction.response.send_message(f"🚫 No VC update channel set for the {pool} pool. Contact a Server staff member.")
 
 
+@tree.command(
+    name="lotterysetupdatechannel",
+    description="Set the channel for donation updates and show pool info."
+)
+@app_commands.describe(
+    channel="The text channel to post updates in"
+)
+async def set_update_channel(
+        interaction: discord.Interaction,
+        channel: discord.TextChannel
+):
+    data = load_json_file("lottery_data.json")
 
+    # Ensure the data has the necessary field for donation updates
+    data.setdefault("update_channels", {})
 
-@tree.command(name="lottery_setupdatechannel", description="Set the channel for donation updates")
-async def set_update_channel(interaction: discord.Interaction, channel: discord.TextChannel):
-    user = interaction.user
+    # Set the channel for donation updates
+    data["update_channels"]["short"] = channel.id
+    data["update_channels"]["long"] = channel.id
+    save_json_file("lottery_data.json", data)
 
-    # Allow if user me lol
-    if user.name != "fragcat." and not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("🚫 You don't have permission to use this command.", ephemeral=False)
-        return
+    # Get pool amounts for both short and long
+    short_pool_amount = data["pools"].get("short", {}).get("amount", 0)
+    long_pool_amount = data["pools"].get("long", {}).get("amount", 0)
 
-    data["update_channel_id"] = channel.id
-    save_data(data)
-    await interaction.response.send_message(f"✅ Updates will now be posted in {channel.mention}")
+    # Post donation update for both pools
+    await channel.send(
+        f"🚨 **Donation Updates** 🚨\n"
+        f"**Short Pool**: {short_pool_amount} marks\n"
+        f"**Long Pool**: {long_pool_amount} marks\n"
+        f"To donate, use `/lottery donate`!"
+    )
+
+    await interaction.response.send_message(
+        f"✅ Donation updates will now be posted in {channel.mention} for both pools.",
+        ephemeral=False
+    )
 
 
 # Store the last update timestamp for each pool to avoid rate limits
 last_update = {}
+
+
+@tree.command(
+    name="lotterylogs",
+    description="View logs of transactions, ticket sales, and winners."
+)
+async def lottery_logs(interaction: discord.Interaction):
+    try:
+        # Load the lottery data from the JSON file
+        data = load_json_file("lottery_data.json")
+
+        # Get logs or return an empty list if there are none
+        log_data = data.get("logs", [])
+
+        # If no logs are found
+        if not log_data:
+            await interaction.response.send_message(
+                "🚫 No logs found. It seems like no transactions have occurred yet.",
+                ephemeral=False
+            )
+            return
+
+        # Start building the log message
+        log_messages = "**Lottery Logs** 📜\n"
+
+        # Iterate over the logs and format them
+        for log in log_data:
+            timestamp = log.get("timestamp", "Unknown time")
+            action = log.get("action", "Unknown action")
+            user = log.get("user", "Unknown user")
+            amount = log.get("amount", 0)
+            pool = log.get("pool", "N/A")
+            message = log.get("message", "No additional info")
+
+            # Add the log to the message string
+            log_messages += f"\n**{timestamp}**: {action} by {user} ({amount} marks for {pool})\nDetails: {message}"
+
+        # Send the formatted log messages
+        await interaction.response.send_message(
+            log_messages,
+            ephemeral=False
+        )
+
+    except Exception as e:
+        # If something goes wrong, send an error message
+        await interaction.response.send_message(
+            f"🚫 Failed to load logs: {str(e)}", ephemeral=False
+        )
 
 
 async def update_pool_channel(pool: str, amount: int, data: dict):
@@ -457,7 +651,7 @@ async def update_pool_channel(pool: str, amount: int, data: dict):
     # Update the timestamp for the pool
     last_update[pool] = current_time
 
-    if "update_channels" not in data or pool not in data["update_channels"]:
+    if "updatechannels" not in data or pool not in data["update_channels"]:
         return
 
     channel_id = data["update_channels"][pool]
@@ -530,11 +724,7 @@ async def setvcchannel(
 # Maximum tickets per user per pool (Ticket cap)
 MAX_TICKETS = 100
 
-# Simulated wallet balance (we'll change this later to use the actual game wallet system)
-USER_WALLET = 1000  # Example: Player has 1000 currency for testing
-
-
-@tree.command(name="lottery_tickets", description="Buy lottery tickets for a pool.")
+@tree.command(name="lotterytickets", description="Buy lottery tickets for a pool.")
 @app_commands.describe(pool="Choose a lottery pool", amount="Number of tickets to buy")
 @commands.cooldown(1, 60, commands.BucketType.user)  # 1 use per minute per user
 async def buy_tickets(interaction: discord.Interaction, pool: Literal["short", "long"], amount: int):
@@ -548,9 +738,9 @@ async def buy_tickets(interaction: discord.Interaction, pool: Literal["short", "
             await interaction.response.send_message("🚫 Amount must be greater than zero.", ephemeral=False)
             return
 
-        # Get the price per ticket
-        price_per_ticket = data["ticket_price"].get(pool, 10)  # Default to 10 if not found
-        total_cost = amount * price_per_ticket
+        # Get the price per ticket, defaulting to 10 if not found
+        ticket_price = data.get("ticket_price", {}).get(pool, 2000)  # Default to 10 if not found
+        total_cost = amount * ticket_price
 
         # Load the user's bank data
         bank_data = load_json_file("bank_data.json")
@@ -561,13 +751,17 @@ async def buy_tickets(interaction: discord.Interaction, pool: Literal["short", "
 
         if user_balance < total_cost:
             await interaction.response.send_message(
-                f"🚫 You don't have enough currency. You need {total_cost} but only have {user_balance}.",
+                f"🚫 You don't have enough marks. You need {total_cost} but only have {user_balance}.",
                 ephemeral=False)
             return
 
         # Deduct the cost from the player's bank balance
         bank_data[user_id] -= total_cost
         save_data("bank_data.json", bank_data)
+
+        # Ensure "tickets" exists for the specified pool
+        if "tickets" not in data["pools"][pool]:
+            data["pools"][pool]["tickets"] = {}
 
         # Update pool amount and user tickets
         data["pools"][pool]["amount"] += total_cost
@@ -577,11 +771,14 @@ async def buy_tickets(interaction: discord.Interaction, pool: Literal["short", "
         # Save updated data to the JSON file
         save_data("lottery_data.json", data)
 
-        # Optionally, update the pool channel amount
+        # Log the updated pool data to ensure it was saved correctly
+        print(f"Updated {pool} pool data: {data['pools'][pool]}")
+
+        # Directly update the channel with the new pool amount after ticket purchase
         await update_pool_channel(pool, data["pools"][pool]["amount"], data)
 
         await interaction.response.send_message(
-            f"✅ You bought **{amount}** ticket(s) for the **{pool}** pool. Total cost: {total_cost} currency.")
+            f"✅ You bought **{amount}** ticket(s) for the **{pool}** pool. Total cost: {total_cost} marks.")
 
     except discord.errors.HTTPException as e:
         # Handle rate limit errors specifically
@@ -592,13 +789,135 @@ async def buy_tickets(interaction: discord.Interaction, pool: Literal["short", "
             await interaction.response.send_message(f"🚫 Failed to process your request: {str(e)}", ephemeral=False)
 
 
-@tree.command(name="lottery_info", description="View info about a lottery pool.")
+
+@tree.command(name="lotterymytickets", description="Check how many lottery tickets you have.")
+async def mytickets(interaction: discord.Interaction):
+    user_id = str(interaction.user.id)
+    data = load_data(LOTTERY_DATA_FILE)
+
+    embed = discord.Embed(
+        title="🎟️ Your Lottery Tickets",
+        description="Here's how many tickets you've bought and how much you've spent in each pool.",
+        color=discord.Color.random()
+    )
+
+    found_tickets = False
+
+    for pool in ["short", "long"]:
+        pool_data = data.get("pools", {}).get(pool, {})
+        user_tickets = pool_data.get("tickets", {}).get(user_id, 0)
+        ticket_price = data.get("ticket_price", {}).get(pool, 10)  # Default price fallback
+
+        if user_tickets > 0:
+            found_tickets = True
+            total_spent = user_tickets * ticket_price
+            embed.add_field(
+                name=f"{pool.capitalize()} Pool",
+                value=f"🎫 {user_tickets:,} ticket(s)\n💸 {total_spent:,} spent",
+                inline=False
+            )
+
+    if not found_tickets:
+        embed.description = "You haven’t bought any tickets yet. Use `/lottery join` to get started!"
+
+    await interaction.response.send_message(embed=embed, ephemeral=False)
+
+
+
+@tree.command(name="lottery_addfunds", description="Admin: Add funds directly to a lottery pool.")
+@app_commands.describe(pool="The lottery pool to add funds to (short or long)", amount="Amount of marks to add")
+async def lottery_addfunds(interaction: discord.Interaction, pool: Literal["short", "long"], amount: int):
+    # Only allow authorized staff (fragcat. check)
+    if not any(role.name.lower().startswith("fragcat") for role in interaction.user.roles):
+        await interaction.response.send_message("🚫 You don't have permission to use this command.", ephemeral=False)
+        return
+
+    data = load_data(LOTTERY_DATA_FILE)
+
+    if pool not in data["pools"]:
+        await interaction.response.send_message("🚫 That pool doesn't exist.", ephemeral=False)
+        return
+
+    # Add funds
+    data["pools"][pool]["amount"] += amount
+
+    # Log it in admin logs
+    data.setdefault("logs", [])
+    data["logs"].append({
+        "type": "fund_add",
+        "pool": pool,
+        "amount": amount,
+        "by": interaction.user.name,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+
+    save_data(LOTTERY_DATA_FILE, data)
+
+    # Try updating the channel name
+    update_channel_id = data.get("update_channels", {}).get(pool)
+    if update_channel_id:
+        channel = interaction.guild.get_channel(update_channel_id)
+        if channel:
+            try:
+                new_channel_name = f"{pool} pool: {data['pools'][pool]['amount']:,}"
+                await channel.edit(name=new_channel_name)
+            except discord.Forbidden:
+                await interaction.followup.send("⚠️ Couldn't update channel name: missing permissions.", ephemeral=False)
+            except discord.HTTPException as e:
+                await interaction.followup.send(f"⚠️ Failed to update channel: {e}", ephemeral=False)
+
+    await interaction.response.send_message(
+        f"✅ Added **{amount:,}** to the **{pool}** pool. Channel updated and transaction logged.",
+        ephemeral=False
+    )
+
+
+@tree.command(name="banktransfer", description="Transfer bank marks to another verified user.")
+@app_commands.describe(user="The user you want to send marks to.", amount="The amount to transfer.")
+async def banktransfer(interaction: discord.Interaction, user: discord.User, amount: int):
+    sender_id = str(interaction.user.id)
+    recipient_id = str(user.id)
+
+    # Load data
+    bank_data = load_json_file(BANK_FILE)
+    verified_users = load_json_file(VERIFIED_USERS_FILE)
+
+    # Make sure both users are verified
+    if sender_id not in verified_users:
+        await interaction.response.send_message("❌ You must verify your account using `/link` before using the bank.", ephemeral=False)
+        return
+    if recipient_id not in verified_users:
+        await interaction.response.send_message("❌ That user is not verified and cannot receive bank transfers.", ephemeral=False)
+        return
+
+    # Check sender balance
+    sender_balance = bank_data.get(sender_id, 0)
+    if sender_balance < amount:
+        await interaction.response.send_message(f"🚫 You don’t have enough funds to transfer **{amount:,}** marks.", ephemeral=False)
+        return
+
+    # Process the transfer
+    bank_data[sender_id] -= amount
+    bank_data[recipient_id] = bank_data.get(recipient_id, 0) + amount
+    save_data(BANK_FILE, bank_data)
+
+    # Confirmation embed
+    embed = discord.Embed(
+        title="Bank Transfer Complete",
+        description=f"Successfully transferred **{amount:,}** marks to **{user.mention}**.",
+        color=discord.Color.green()
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=False)
+
+
+
+@tree.command(name="lotteryinfo", description="View info about a lottery pool.")
 @app_commands.describe(pool="Choose a lottery pool to view info for")
 async def lottery_info(interaction: discord.Interaction, pool: Literal["short", "long"]):
     data = load_data(LOTTERY_DATA_FILE)
 
     if pool not in data["pools"]:
-        await interaction.response.send_message("🚫 That lottery pool doesn't exist.", ephemeral=True)
+        await interaction.response.send_message("🚫 That lottery pool doesn't exist.", ephemeral=False)
         return
 
     pool_data = data["pools"][pool]
@@ -631,8 +950,8 @@ async def lottery_info(interaction: discord.Interaction, pool: Literal["short", 
         title=f"🎟️ {pool.capitalize()} Lottery Info",
         color=discord.Color.gold()
     )
-    embed.add_field(name="💰 Total Pot", value=f"{total_amount:,} currency", inline=False)
-    embed.add_field(name="🎫 Ticket Price", value=f"{ticket_price} currency", inline=True)
+    embed.add_field(name="💰 Total Pot", value=f"{total_amount:,} marks", inline=False)
+    embed.add_field(name="🎫 Ticket Price", value=f"{ticket_price} marks", inline=True)
     embed.add_field(name="🧍 Participants", value=str(num_participants), inline=True)
     embed.add_field(name="🕒 Time Until Draw", value=time_left, inline=False)
     embed.set_footer(text="Good luck!")
@@ -668,70 +987,72 @@ async def lottery_join(interaction: discord.Interaction, pool: app_commands.Choi
         f"✅ You’ve joined the **{pool_key}** pool with **1** ticket! Good luck!"
     )
 
-
-@tree.command(name="lottery_draw", description="Draw a winner from a lottery pool.")
+@tree.command(name="lotterydraw", description="Draw a winner from a lottery pool.")
 @app_commands.describe(pool="Which pool to draw from")
 @commands.cooldown(1, 300, commands.BucketType.guild)  # 1 draw per 5 minutes per server
 async def draw_winner(interaction: discord.Interaction, pool: Literal["short", "long"]):
-    # Your function implementation
+    try:
+        # 1) Load
+        data = load_json_file("lottery_data.json")
 
-    # 1) Load
-    data = load_json_file("lottery_data.json")
+        # 2) Validate pool
+        if pool not in data["pools"]:
+            await interaction.response.send_message(f"🚫 Pool `{pool}` does not exist.", ephemeral=False)
+            return
 
-    # 2) Validate pool
-    if pool not in data["pools"]:
-        await interaction.response.send_message(f"🚫 Pool `{pool}` does not exist.", ephemeral=False)
-        return
+        pool_data = data["pools"][pool]
+        pool_tickets = pool_data.get("tickets", {})
 
-    pool_data   = data["pools"][pool]
-    pool_tickets = pool_data.get("tickets", {})
+        # 3) No entries?
+        if not pool_tickets:
+            await interaction.response.send_message(f"🚫 No entries in the {pool} pool.", ephemeral=False)
+            return
 
-    # 3) No entries?
-    if not pool_tickets:
-        await interaction.response.send_message(f"🚫 No entries in the {pool} pool.", ephemeral=False)
-        return
+        # 4) Build weighted list
+        entries = []
+        for user_id, count in pool_tickets.items():
+            entries.extend([user_id] * count)
 
-    # 4) Build weighted list
-    entries = []
-    for user_id, count in pool_tickets.items():
-        entries.extend([user_id] * count)
+        # 5) Pick winner
+        winner_id = random.choice(entries)
+        winner = await interaction.client.fetch_user(int(winner_id))
 
-    # 5) Pick winner
-    winner_id = random.choice(entries)
-    winner    = await interaction.client.fetch_user(int(winner_id))
+        # 6) Payout is entire pool
+        prize = pool_data["amount"]
 
-    # 6) Payout is entire pool
-    prize = pool_data["amount"]
+        # 7) Log it
+        data["logs"].append({
+            "type": "draw",
+            "winner": winner.name,
+            "user_id": str(winner_id),
+            "pool": pool,
+            "amount": prize,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
 
-    # 7) Log it
-    data["logs"].append({
-        "type":      "draw",
-        "winner":    winner.name,
-        "user_id":   str(winner_id),
-        "pool":      pool,
-        "amount":    prize,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    })
+        # 8) Reset pool & tickets
+        data["pools"][pool]["amount"] = 0
+        data["pools"][pool]["tickets"] = {}
 
-    # 8) Reset pool & tickets
-    data["pools"][pool]["amount"]  = 0
-    data["pools"][pool]["tickets"] = {}
+        # 9) Save
+        save_data("lottery_data.json", data)
 
-    # 9) Save
-    save_data("lottery_data.json", data)
+        # 10) Award the prize to the winner's bank
+        bank_data = load_json_file("bank_data.json")
+        if winner_id not in bank_data:
+            bank_data[winner_id] = 0  # Initialize bank balance if not already present
 
-    # 10) Award the prize to the winner's bank
-    bank_data = load_json_file("bank_data.json")
-    if winner_id not in bank_data:
-        bank_data[winner_id] = 0  # Initialize bank balance if not already present
+        bank_data[winner_id] += prize
+        save_data("bank_data.json", bank_data)
 
-    bank_data[winner_id] += prize
-    save_data("bank_data.json", bank_data)
+        # 11) Update channel name
+        await update_pool_channel(pool, 0, data)
 
-    # 11) Update channel name
-    await update_pool_channel(pool, 0, data)
+        await interaction.response.send_message(f"🎉 The winner of the {pool} pool is {winner.mention}!\nThey win {prize}.")
 
-    await interaction.response.send_message(f"🎉 The winner of the {pool} pool is {winner.mention}!\nThey win {prize}.")
+    except Exception as e:
+        # Handle any unexpected errors
+        await interaction.response.send_message(f"🚫 An error occurred while drawing the winner: {str(e)}", ephemeral=False)
 
 
 String = "70uLs-wuydV0fbkL511ixNfw3W0swxCbYRZhHvFuj-k="
