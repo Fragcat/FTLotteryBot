@@ -20,7 +20,7 @@ intents = discord.Intents.default()
 intents.members = True  # Enable member intent
 
 GUILD_ID = 1107774033107361904  # Your actual guild ID
-USER_ID = 854847609163743242   # The test user's ID
+USER_ID = 0000000000000   # The test user's ID
 amount = 25
 
 # Load verification data
@@ -43,14 +43,15 @@ tree = app_commands.CommandTree(client)
 
 def generate_invoice_id():
     random_number = random.randint(100000000000000000, 999999999999999999)
-    invoice_id = f"invoice-#1-9306782"
+    invoice_id = f"invoice-#1-"
     return invoice_id
-
-
 
 @tasks.loop(hours=24)
 async def send_monthly_invoice():
-    now = datetime.now(timezone.utc)
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    now = datetime.now(ZoneInfo("America/Los_Angeles"))
     current_day = now.day
     month_name = now.strftime("%B")
 
@@ -66,8 +67,9 @@ async def send_monthly_invoice():
 
     day_suffix = get_day_suffix(current_day)
 
-    if current_day != 8:
-        print(f"[Invoice Task] Skipping - today is {month_name} {current_day}{day_suffix}, not the 8th.")
+    # Check if today is the 7th
+    if current_day != 7:
+        print(f"[Invoice Task] Skipping - today is {month_name} {current_day}{day_suffix}, not the 7th.")
         return
 
     # Predefined PayPal invoice link
@@ -80,9 +82,9 @@ async def send_monthly_invoice():
         print(f"[Invoice Task] Found user: {user.display_name}")
 
         message = (
-            f"Hi {user.display_name}, your invoice for this month has just been issued.\n"
+            f"Hi {user.display_name}! Your initial hosting invoice has just been issued.\n"
             f"> Invoice ID: `{invoice_id}`\n"
-            f"> Due By: Tuesday, April 8, 2025\n"
+            f"> Due By: Monday, April 7, 2025\n"
             f"- **Pay here: {invoice_link}**"
         )
 
@@ -97,14 +99,15 @@ async def on_ready():
     print(f"Logged into Lottery Client as {client.user}")
 
     # Start the task loop
-
     print("[Startup] Invoice task started. Will only send on the 8th of each month.")
 
     # Try to fetch the user and confirm
+    await send_monthly_invoice()
     try:
         user = await client.fetch_user(USER_ID)
     except discord.errors.NotFound:
         print(f"[Startup] Could not find user with ID {USER_ID}")
+
 
 
 def execute_rcon_command(command):
