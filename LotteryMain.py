@@ -1,7 +1,6 @@
 import asyncio
 from aiohttp.hdrs import SERVER
 import discord
-from datetime import datetime
 import re
 import mcrcon
 VERIFIED_USERS_FILE_PATH = ('verified_users.json')
@@ -12,6 +11,7 @@ def load_verified_users():
         with open(VERIFIED_USERS_FILE_PATH, 'r') as f:
             return json.load(f)
     return {}
+
 
 
 
@@ -33,7 +33,7 @@ def load_verification_data():
 
 from LotteryImports import *
 from LotteryImports import load_json_file, save_json_file, SERVER_ID, get_session_value
-import datetime, os, discord
+import os, discord
 from discord.ext import tasks
 
 intents = discord.Intents.default()
@@ -50,7 +50,7 @@ def generate_invoice_id():
 
 @tasks.loop(hours=24)
 async def send_monthly_invoice():
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.now(timezone.utc)
     current_day = now.day
     month_name = now.strftime("%B")
 
@@ -370,6 +370,21 @@ async def verify_command(interaction: discord.Interaction, ign: str):
     except mcrcon.MCRconException as e:
         await interaction.response.send_message(f"An error occurred while sending the verification code: {e}",
                                                 ephemeral=False)
+@tree.command(name="help", description="List all available commands.")
+async def help_command(interaction: discord.Interaction):
+    # Get all commands registered to the bot
+    command_list = [command.name for command in tree.get_commands()]
+
+    # Build the response with the command names and their descriptions
+    response = "Here are all the available commands:\n\n"
+    for command in command_list:
+        cmd_obj = tree.get_command(command)  # Get the command object
+        description = cmd_obj.description if cmd_obj.description else "No description available"
+        response += f"**/{command}**: {description}\n"
+
+    # Send the list of commands to the user
+    await interaction.response.send_message(response, ephemeral=False)
+
 
 
 @tree.command(
@@ -405,14 +420,8 @@ async def verify_code_command(interaction: discord.Interaction, code: str):
         if verified_role:
             await interaction.user.add_roles(verified_role)
 
-        # Execute the RCON command to promote the user
-        rcon_command = f"promote {ign} Member"
-        rcon_response = execute_rcon_command(rcon_command)
-        if rcon_response is not None:
-            print(f"[DEBUG] Executed RCON command: {rcon_command}, Response: {rcon_response}")
-
         await interaction.response.send_message(
-            f"Successfully verified! Your in-game name {ign} is now also linked to your Discord account.", ephemeral=False)
+            f"Successfully verified! Your in-game name {ign} is now linked to your Discord account.", ephemeral=False)
     else:
         await interaction.response.send_message("Invalid verification code. Please try again.", ephemeral=False)
 
@@ -467,80 +476,71 @@ async def setpot(interaction: discord.Interaction, pool: Literal["short", "long"
     else:
         await interaction.response.send_message("🚫 No update channel is set for this pool.")
 
+from datetime import datetime, timezone
+from datetime import datetime, timezone
 
-
-@tree.command(name="lottery_donate", description="Donate marks to a lottery pool")
+@tree.command(name="lottery_donate", description="Donate currency to a lottery pool")
 @app_commands.describe(amount="The amount to donate.", pool="Choose either the short or long lottery pool to join.")
 async def donate(interaction: discord.Interaction, pool: Literal["short", "long"], amount: int):
-    # Load existing data using the new function
+    await interaction.response.defer(ephemeral=False)
+
     data = load_json_file("lottery_data.json")
+    data.setdefault("pools", {
+        "short": {"amount": 0, "tickets": {}},
+        "long":  {"amount": 0, "tickets": {}}
+    })
+    data.setdefault("logs", [])
+    data.setdefault("update_channels", {})
+    data.setdefault("vc_channels", {})
 
-    # Ensure 'pools' and 'update_channels' sections exist in the data
-    if 'pools' not in data:
-        data['pools'] = {'short': {'amount': 0}, 'long': {'amount': 0}}  # Initialize pools if missing
-    if 'update_channels' not in data:
-        data['update_channels'] = {}
-
-    # Validate pool existence in data
     if pool not in data["pools"]:
-        await interaction.response.send_message(f"🚫 Invalid pool name '{pool}'. Please choose 'short' or 'long'.", ephemeral=False)
+        await interaction.followup.send("🚫 Invalid pool. Choose `short` or `long`.", ephemeral=False)
         return
 
-    # Load the user's bank data
     bank_data = load_json_file("bank_data.json")
     user_id = str(interaction.user.id)
-
-    # Check if the player has enough balance to donate
     user_balance = bank_data.get(user_id, 0)
 
     if user_balance < amount:
-        await interaction.response.send_message(f"🚫 You don't have enough marks to donate {amount}.", ephemeral=False)
+        await interaction.followup.send(f"🚫 You only have {user_balance:,} marks in the bank.", ephemeral=False)
         return
 
-    # Deduct the donated amount from the player's bank balance
-    bank_data[user_id] -= amount
-    save_data("bank_data.json", bank_data)
+    bank_data[user_id] = user_balance - amount
+    save_json_file("bank_data.json", bank_data)
 
-    # Update the pool amount
     data["pools"][pool]["amount"] += amount
-    save_data("lottery_data.json", data)
+    save_json_file("lottery_data.json", data)
 
-    # Now update the relevant channel name
-    if pool in data['update_channels']:
-        channel_id = data['update_channels'][pool]
-        channel = interaction.guild.get_channel(channel_id)
+    # Log the donation with ISO‑formatted timestamp
+    data["logs"].append({
+        "type":      "donation",
+        "user":      interaction.user.name,
+        "user_id":   user_id,
+        "pool":      pool,
+        "amount":    amount,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+    save_json_file("lottery_data.json", data)
 
-        if channel:
-            try:
-                # Format the new channel name to include the pool total
-                new_channel_name = f"{pool} pool: {data['pools'][pool]['amount']:,}"
+    # Send embed to text channel
+    text_id = data["update_channels"].get(pool)
+    if text_id:
+        text_ch = interaction.guild.get_channel(text_id)
+        if text_ch:
+            embed = discord.Embed(
+                title="💸 New Lottery Donation!",
+                description=(
+                    f"**{interaction.user.display_name}** donated **{amount:,}** marks to the **{pool}** pool.\n"
+                    f"**Total in {pool} pool:** {data['pools'][pool]['amount']:,} marks"
+                ),
+                color=discord.Color.random(),
+                timestamp=datetime.now(timezone.utc)
+            )
+            embed.set_footer(text="Use /lottery donate to contribute!")
+            await text_ch.send(embed=embed)
 
-                # Rename the channel
-                await channel.edit(name=new_channel_name)
+    await interaction.followup.send(f"✅ You donated **{amount:,}** to the **{pool}** pool!", ephemeral=False)
 
-                # Send embed to update the community
-                embed = discord.Embed(
-                    title="💸 New Lottery Donation!",
-                    description=f"**{interaction.user.display_name}** donated **{amount}** to the **{pool}** pool!",
-                    color=discord.Color.green()
-                )
-                embed.set_footer(text=f"Total in {pool} pool: {data['pools'][pool]['amount']:,}")
-                await channel.send(embed=embed)
-
-                # Acknowledge the donation
-                await interaction.response.send_message(
-                    f"✅ Thanks! You donated {amount} to the {pool} pool."
-                )
-            except discord.Forbidden:
-                await interaction.response.send_message("🚫 I do not have permission to rename this channel.")
-            except discord.HTTPException as e:
-                await interaction.response.send_message(f"🚫 Failed to rename channel: {str(e)}")
-            except Exception as e:
-                await interaction.response.send_message(f"🚫 An unexpected error occurred: {str(e)}")
-        else:
-            await interaction.response.send_message("🚫 The channel for this pool could not be found.")
-    else:
-        await interaction.response.send_message(f"🚫 No VC update channel set for the {pool} pool. Contact a Server staff member.")
 
 
 @tree.command(
@@ -556,17 +556,22 @@ async def set_update_channel(
 ):
     data = load_json_file("lottery_data.json")
 
-    # Ensure the data has the necessary field for donation updates
-    data.setdefault("update_channels", {})
+    # Ensure the necessary fields are present
+    data.setdefault("pools", {
+        "short": {"amount": 0, "tickets": {}},
+        "long":  {"amount": 0, "tickets": {}}
+    })
+    data.setdefault("update_channels", {})  # text channels
+    data.setdefault("vc_channels", {})      # voice channels
 
     # Set the channel for donation updates
     data["update_channels"]["short"] = channel.id
-    data["update_channels"]["long"] = channel.id
+    data["update_channels"]["long"] = channel.id  # Assign the same channel ID for both pools
     save_json_file("lottery_data.json", data)
 
     # Get pool amounts for both short and long
-    short_pool_amount = data["pools"].get("short", {}).get("amount", 0)
-    long_pool_amount = data["pools"].get("long", {}).get("amount", 0)
+    short_pool_amount = data["pools"]["short"].get("amount", 0)
+    long_pool_amount = data["pools"]["long"].get("amount", 0)
 
     # Post donation update for both pools
     await channel.send(
@@ -641,7 +646,7 @@ async def update_pool_channel(pool: str, amount: int, data: dict):
     cooldown_seconds = 300  # Set cooldown period to 5 minutes (300 seconds)
 
     # Get current time
-    current_time = datetime.datetime.now(datetime.timezone.utc)
+    current_time = datetime.now(timezone.utc)
 
     # Check if enough time has passed since the last update for the pool
     if pool in last_update and current_time - last_update[pool] < cooldown_seconds:
@@ -676,50 +681,6 @@ async def update_pool_channel(pool: str, amount: int, data: dict):
         print(f"DEBUG: [WARNING] Missing permissions to rename channel {channel_id}")
     except discord.HTTPException as e:
         print(f"DEBUG: [ERROR] Failed to rename channel: {e}")
-
-
-@tree.command(
-    name="setvcchannel",
-    description="Set the voice channel to update with pool totals"
-)
-@app_commands.describe(
-    pool="Choose either the short or long lottery pool",
-    channel="The voice channel that will be renamed with the pool total"
-)
-async def setvcchannel(
-    interaction: discord.Interaction,
-    pool: Literal["short", "long"],
-    channel: discord.VoiceChannel
-):
-    # Load your existing data
-    data = load_json_file("lottery_data.json")
-
-    # Ensure the 'update_channels' section exists in the data
-    data.setdefault("update_channels", {})
-
-    # Save the channel ID for the selected pool
-    data["update_channels"][pool] = channel.id
-
-    # Save the updated data
-    save_data("lottery_data.json", data)
-
-    # Rename the channel with the pool name (You can customize this format)
-    try:
-        new_channel_name = f"{pool} pool: {channel.name}"
-        await channel.edit(name=new_channel_name)  # Renames the channel
-        await interaction.response.send_message(
-            f"✅ Channel for **{pool}** pool set to {channel.mention} and renamed successfully."
-        )
-    except discord.Forbidden:
-        await interaction.response.send_message(
-            "🚫 I do not have permission to rename this channel."
-        )
-    except discord.HTTPException as e:
-        await interaction.response.send_message(f"🚫 Failed to rename channel: {str(e)}")
-    except Exception as e:
-        await interaction.response.send_message(f"🚫 An unexpected error occurred: {str(e)}")
-
-
 
 # Maximum tickets per user per pool (Ticket cap)
 MAX_TICKETS = 100
@@ -931,7 +892,7 @@ async def lottery_info(interaction: discord.Interaction, pool: Literal["short", 
     if next_draw_timestamp:
         try:
             from datetime import datetime, timezone
-            now = datetime.now(timezone.utc).timestamp()
+            now = datetime.now(timezone.utc)
             seconds_remaining = int(next_draw_timestamp - now)
 
             if seconds_remaining > 0:

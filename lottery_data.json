@@ -1,8 +1,4 @@
 {
-    "ticket_price": {
-        "short": 5000,
-        "long": 10000
-    },
     "pools": {
         "short": {
             "amount": 0,
@@ -12,5 +8,25 @@
             "amount": 0,
             "tickets": {}
         }
-    }
+    },
+    "logs": [
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "user_id": "854847609163743242",
+            "pool": "long",
+            "amount": 122,
+            "timestamp": "2025-04-08T02:16:00.806546+00:00"
+        },
+        {
+            "type": "draw",
+            "winner": "fragcat.",
+            "user_id": "854847609163743242",
+            "pool": "long",
+            "amount": 244,
+            "timestamp": "2025-04-08T02:16:39.708278+00:00"
+        }
+    ],
+    "update_channels": {},
+    "vc_channels": {}
 }
