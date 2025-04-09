@@ -20,7 +20,7 @@ intents = discord.Intents.default()
 intents.members = True  # Enable member intent
 
 GUILD_ID = 1107774033107361904  # Your actual guild ID
-USER_ID = 0000000000000   # The test user's ID
+USER_ID = 0000000000   # The test user's ID
 amount = 25
 
 # Load verification data
@@ -68,7 +68,7 @@ async def send_monthly_invoice():
     day_suffix = get_day_suffix(current_day)
 
     # Check if today is the 7th
-    if current_day != 7:
+    if current_day != 8:
         print(f"[Invoice Task] Skipping - today is {month_name} {current_day}{day_suffix}, not the 7th.")
         return
 
@@ -82,10 +82,11 @@ async def send_monthly_invoice():
         print(f"[Invoice Task] Found user: {user.display_name}")
 
         message = (
-            f"Hi {user.display_name}! Your initial hosting invoice has just been issued.\n"
-            f"> Invoice ID: `{invoice_id}`\n"
-            f"> Due By: Monday, April 7, 2025\n"
-            f"- **Pay here: {invoice_link}**"
+            f"Hi {user.display_name}! This is a quick reminder that your hosting invoice is now due.\n"
+            f"> Invoice ID: `invoice-#1-9306782`\n"
+            f"> Issued: Sunday, April 7, 2025\n"
+            f"> Due By: Monday, April 8, 2025\n"
+            f"- **You may find your Invoice link in the previous message.**"
         )
 
         await user.send(message)
@@ -787,12 +788,12 @@ async def mytickets(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, ephemeral=False)
 
 
-
 @tree.command(name="lottery_addfunds", description="Admin: Add funds directly to a lottery pool.")
 @app_commands.describe(pool="The lottery pool to add funds to (short or long)", amount="Amount of marks to add")
 async def lottery_addfunds(interaction: discord.Interaction, pool: Literal["short", "long"], amount: int):
-    # Only allow authorized staff (fragcat. check)
-    if not any(role.name.lower().startswith("fragcat") for role in interaction.user.roles):
+    # Check if user has the required role by ID
+    required_role_id = 1108923114433286185
+    if not any(role.id == required_role_id for role in interaction.user.roles):
         await interaction.response.send_message("🚫 You don't have permission to use this command.", ephemeral=False)
         return
 
