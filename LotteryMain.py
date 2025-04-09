@@ -247,9 +247,30 @@ def load_data(file_path):
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
-
-# Save data to a JSON file
+# Save data to a JSON file, with fallback defaults if needed
 def save_data(file_path, data):
+    # Define defaults per file path
+    defaults = {
+        "lottery_data.json": {
+            "pools": {
+                "short": {"amount": 0, "tickets": {}, "next_draw": None},
+                "long": {"amount": 0, "tickets": {}, "next_draw": None}
+            },
+            "ticket_price": {"short": 10, "long": 10},
+            "update_channels": {},
+            "logs": []
+        },
+        "bank_data.json": {},
+        "verified_users.json": {},
+        "pending_verifications.json": {}
+    }
+
+    # Merge with defaults if applicable
+    default_data = defaults.get(file_path)
+    if default_data:
+        for key, value in default_data.items():
+            data.setdefault(key, value)
+
     with open(file_path, 'w') as file:
         json.dump(data, file, indent=4)
 
@@ -688,6 +709,29 @@ async def update_pool_channel(pool: str, amount: int, data: dict):
 
 # Maximum tickets per user per pool (Ticket cap)
 MAX_TICKETS = 100
+
+# Example default data structure
+default_data = {
+    "pools": {
+        "short": {
+            "amount": 0,
+            "tickets": {},
+            "next_draw": None
+        },
+        "long": {
+            "amount": 0,
+            "tickets": {},
+            "next_draw": None
+        }
+    },
+    "ticket_price": {
+        "short": 10,
+        "long": 25
+    },
+    "update_channels": {},
+    "logs": []
+}
+
 
 @tree.command(name="lotterytickets", description="Buy lottery tickets for a pool.")
 @app_commands.describe(pool="Choose a lottery pool", amount="Number of tickets to buy")
