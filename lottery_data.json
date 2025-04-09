@@ -1,12 +1,16 @@
 {
     "pools": {
         "short": {
-            "amount": 0,
-            "tickets": {}
+            "amount": 5122,
+            "tickets": {
+                "470726053086625792": 1
+            }
         },
         "long": {
-            "amount": 0,
-            "tickets": {}
+            "amount": 10122,
+            "tickets": {
+                "470726053086625792": 1
+            }
         }
     },
     "ticket_price": {
@@ -37,6 +41,22 @@
             "pool": "long",
             "amount": 1,
             "timestamp": "2025-04-09T01:53:58.689201+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "user_id": "854847609163743242",
+            "pool": "long",
+            "amount": 122,
+            "timestamp": "2025-04-09T04:08:32.891369+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "fragcat.",
+            "user_id": "854847609163743242",
+            "pool": "short",
+            "amount": 122,
+            "timestamp": "2025-04-09T04:08:39.013733+00:00"
         }
     ],
     "update_channels": {},
