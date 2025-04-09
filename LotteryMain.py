@@ -943,7 +943,8 @@ async def lottery_info(interaction: discord.Interaction, pool: Literal["short", 
             now = datetime.now(timezone.utc)
             seconds_remaining = int(next_draw_timestamp - now)
 
-            if seconds_remaining > 0:
+            seconds_remaining = (next_draw_timestamp - now).total_seconds()
+            if seconds_remaining < 0:
                 hours, remainder = divmod(seconds_remaining, 3600)
                 minutes, seconds = divmod(remainder, 60)
                 time_left = f"{hours}h {minutes}m {seconds}s"
