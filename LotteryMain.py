@@ -1002,7 +1002,7 @@ async def lottery_join(interaction: discord.Interaction, pool: app_commands.Choi
 @commands.cooldown(1, 300, commands.BucketType.guild)  # 1 draw per 5 minutes per server
 async def draw_winner(interaction: discord.Interaction, pool: Literal["short", "long"]):
     try:
-        # 1) Load
+        # 1) Load lottery data
         data = load_json_file("lottery_data.json")
 
         # 2) Validate pool
@@ -1040,29 +1040,33 @@ async def draw_winner(interaction: discord.Interaction, pool: Literal["short", "
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
-        # 8) Reset pool & tickets
+        # 8) Reset pool
         data["pools"][pool]["amount"] = 0
         data["pools"][pool]["tickets"] = {}
 
-        # 9) Save
+        # 9) Save lottery data
         save_data("lottery_data.json", data)
 
         # 10) Award the prize to the winner's bank
         bank_data = load_json_file("bank_data.json")
         if winner_id not in bank_data:
-            bank_data[winner_id] = 0  # Initialize bank balance if not already present
+            bank_data[winner_id] = 0  # Initialize if needed
 
         bank_data[winner_id] += prize
         save_data("bank_data.json", bank_data)
 
-        # 11) Update channel name
-        await update_pool_channel(pool, 0, data)
-
-        await interaction.response.send_message(f"🎉 The winner of the {pool} pool is {winner.mention}!\nThey win {prize}.")
+        # 11) Notify
+        await interaction.response.send_message(
+            f"🎉 The winner of the {pool} pool is {winner.mention}!\nThey win {prize} marks!"
+        )
 
     except Exception as e:
-        # Handle any unexpected errors
-        await interaction.response.send_message(f"🚫 An error occurred while drawing the winner: {str(e)}", ephemeral=False)
+        import traceback
+        traceback.print_exc()
+        await interaction.response.send_message(
+            f"🚫 An error occurred while drawing the winner: {str(e)}", ephemeral=False
+        )
+
 
 
 String = "70uLs-wuydV0fbkL511ixNfw3W0swxCbYRZhHvFuj-k="

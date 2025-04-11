@@ -151,15 +151,26 @@ import os
 # Path to the lottery data JSON file
 LOTTERY_DATA_PATH = "lottery_data.json"
 
-def load_json_file(path):
-    if not os.path.exists(path) or os.stat(path).st_size == 0:
-        return {}
+def load_json_file_safe(path):
     try:
-        with open(path, 'r') as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        print(f"[ERROR] Failed to decode {path}; returning empty dict.")
-        return {}
+        with open(path, "r") as f:
+            data = json.load(f)
+        if "pools" not in data:
+            raise ValueError("Missing 'pools' in lottery data.")
+        return data
+    except Exception as e:
+        print(f"[ERROR] Failed to load {path}: {e}")
+        return {
+            "pools": {
+                "short": {"amount": 0, "tickets": {}},
+                "long": {"amount": 0, "tickets": {}}
+            },
+            "ticket_price": {"short": 5000, "long": 10000},
+            "logs": [],
+            "update_channels": {},
+            "vc_channels": {}
+        }
+
 
 
 def save_data(data):

@@ -1,16 +1,12 @@
 {
     "pools": {
         "short": {
-            "amount": 5122,
-            "tickets": {
-                "470726053086625792": 1
-            }
+            "amount": 0,
+            "tickets": {}
         },
         "long": {
-            "amount": 10122,
-            "tickets": {
-                "470726053086625792": 1
-            }
+            "amount": 0,
+            "tickets": {}
         }
     },
     "ticket_price": {
@@ -28,35 +24,19 @@
         },
         {
             "type": "draw",
+            "winner": "babybushmaker",
+            "user_id": "470726053086625792",
+            "pool": "short",
+            "amount": 10000,
+            "timestamp": "2025-04-11T04:10:07.955312+00:00"
+        },
+        {
+            "type": "draw",
             "winner": "fragcat.",
             "user_id": "854847609163743242",
             "pool": "long",
-            "amount": 244,
-            "timestamp": "2025-04-08T02:16:39.708278+00:00"
-        },
-        {
-            "type": "donation",
-            "user": "fragcat.",
-            "user_id": "854847609163743242",
-            "pool": "long",
-            "amount": 1,
-            "timestamp": "2025-04-09T01:53:58.689201+00:00"
-        },
-        {
-            "type": "donation",
-            "user": "fragcat.",
-            "user_id": "854847609163743242",
-            "pool": "long",
-            "amount": 122,
-            "timestamp": "2025-04-09T04:08:32.891369+00:00"
-        },
-        {
-            "type": "donation",
-            "user": "fragcat.",
-            "user_id": "854847609163743242",
-            "pool": "short",
-            "amount": 122,
-            "timestamp": "2025-04-19T04:08:39.013733+00:00"
+            "amount": 130000,
+            "timestamp": "2025-04-11T04:15:30.275120+00:00"
         }
     ],
     "update_channels": {},
