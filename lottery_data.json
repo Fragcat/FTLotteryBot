@@ -1,11 +1,13 @@
 {
     "pools": {
         "short": {
-            "amount": 0,
-            "tickets": {}
+            "amount": 466710,
+            "tickets": {
+                "311368142922186752": 5
+            }
         },
         "long": {
-            "amount": 0,
+            "amount": 79260,
             "tickets": {}
         }
     },
@@ -37,8 +39,180 @@
             "pool": "long",
             "amount": 130000,
             "timestamp": "2025-04-11T04:15:30.275120+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "babybushmaker",
+            "user_id": "470726053086625792",
+            "pool": "short",
+            "amount": 150,
+            "timestamp": "2025-04-12T19:32:16.444197+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "babybushmaker",
+            "user_id": "470726053086625792",
+            "pool": "long",
+            "amount": 150,
+            "timestamp": "2025-04-12T19:32:23.828852+00:00"
+        },
+        {
+            "type": "fund_add",
+            "pool": "short",
+            "amount": 1500,
+            "by": "babybushmaker",
+            "timestamp": "2025-04-12T19:32:41.045770"
+        },
+        {
+            "type": "fund_add",
+            "pool": "long",
+            "amount": 15000,
+            "by": "babybushmaker",
+            "timestamp": "2025-04-12T19:32:48.308590"
+        },
+        {
+            "type": "draw",
+            "winner": "drakodragongod",
+            "user_id": "622227758604353576",
+            "pool": "short",
+            "amount": 21650,
+            "timestamp": "2025-04-12T19:36:07.605842+00:00"
+        },
+        {
+            "type": "draw",
+            "winner": "babybushmaker",
+            "user_id": "470726053086625792",
+            "pool": "long",
+            "amount": 40150,
+            "timestamp": "2025-04-12T19:36:13.526491+00:00"
+        },
+        {
+            "type": "fund_add",
+            "pool": "short",
+            "amount": 1500,
+            "by": "babybushmaker",
+            "timestamp": "2025-04-12T20:18:48.608563"
+        },
+        {
+            "type": "fund_add",
+            "pool": "long",
+            "amount": 15000,
+            "by": "babybushmaker",
+            "timestamp": "2025-04-12T20:18:57.902494"
+        },
+        {
+            "type": "fund_add",
+            "pool": "short",
+            "amount": 415100,
+            "by": "babybushmaker",
+            "timestamp": "2025-04-12T21:27:37.852393"
+        },
+        {
+            "type": "fund_add",
+            "pool": "long",
+            "amount": 150,
+            "by": "babybushmaker",
+            "timestamp": "2025-04-12T21:27:54.424646"
+        },
+        {
+            "type": "fund_add",
+            "pool": "short",
+            "amount": 15000,
+            "by": "babybushmaker",
+            "timestamp": "2025-04-12T21:28:25.658078"
+        },
+        {
+            "type": "fund_add",
+            "pool": "short",
+            "amount": 1500,
+            "by": "babybushmaker",
+            "timestamp": "2025-04-12T21:28:49.241342"
+        },
+        {
+            "type": "donation",
+            "user": "ryner.ige",
+            "user_id": "311368142922186752",
+            "pool": "short",
+            "amount": 10,
+            "timestamp": "2025-04-13T01:44:47.005739+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "ryner.ige",
+            "user_id": "311368142922186752",
+            "pool": "long",
+            "amount": 10,
+            "timestamp": "2025-04-13T01:44:54.409130+00:00"
+        },
+        {
+            "type": "fund_add",
+            "pool": "long",
+            "amount": 1000,
+            "by": "ryner.ige",
+            "timestamp": "2025-04-13T01:49:40.694461"
+        },
+        {
+            "type": "draw",
+            "winner": "ryner.ige",
+            "user_id": "311368142922186752",
+            "pool": "long",
+            "amount": 66160,
+            "timestamp": "2025-04-13T01:51:56.333408+00:00"
+        },
+        {
+            "type": "donation",
+            "user": "ryner.ige",
+            "user_id": "311368142922186752",
+            "pool": "long",
+            "amount": 66160,
+            "timestamp": "2025-04-13T01:52:18.518110+00:00"
+        },
+        {
+            "type": "fund_add",
+            "pool": "short",
+            "amount": 10000,
+            "by": "ryner.ige",
+            "timestamp": "2025-04-13T01:54:25.649373"
+        },
+        {
+            "type": "fund_add",
+            "pool": "long",
+            "amount": 10000,
+            "by": "ryner.ige",
+            "timestamp": "2025-04-13T01:54:57.482882"
+        },
+        {
+            "type": "fund_add",
+            "pool": "long",
+            "amount": 1000,
+            "by": "ryner.ige",
+            "timestamp": "2025-04-13T01:55:25.831480"
+        },
+        {
+            "type": "fund_add",
+            "pool": "long",
+            "amount": 1000,
+            "by": "ryner.ige",
+            "timestamp": "2025-04-13T02:08:38.227573"
+        },
+        {
+            "type": "fund_add",
+            "pool": "long",
+            "amount": 1000,
+            "by": "ryner.ige",
+            "timestamp": "2025-04-13T02:09:48.984771"
+        },
+        {
+            "type": "fund_add",
+            "pool": "long",
+            "amount": 100,
+            "by": "babybushmaker",
+            "timestamp": "2025-04-13T02:10:30.085933"
         }
     ],
-    "update_channels": {},
+    "update_channels": {
+        "short": 1360729391205978224,
+        "long": 1360729391205978224
+    },
     "vc_channels": {}
 }

@@ -690,20 +690,21 @@ async def mytickets(interaction: discord.Interaction):
 
     await interaction.response.send_message(embed=embed, ephemeral=False)
 
-
 @tree.command(name="lotteryaddfunds", description="Admin: Add funds directly to a lottery pool.")
 @app_commands.describe(pool="The lottery pool to add funds to (short or long)", amount="Amount of marks to add")
 async def lottery_addfunds(interaction: discord.Interaction, pool: Literal["short", "long"], amount: int):
+    await interaction.response.defer()  # Defer right away to avoid timeout
+
     # Check if user has the required role by ID
     required_role_id = 1108923114433286185
     if not any(role.id == required_role_id for role in interaction.user.roles):
-        await interaction.response.send_message("🚫 You don't have permission to use this command.", ephemeral=False)
+        await interaction.followup.send("🚫 You don't have permission to use this command.", ephemeral=True)
         return
 
     data = load_data(LOTTERY_DATA_FILE)
 
     if pool not in data["pools"]:
-        await interaction.response.send_message("🚫 That pool doesn't exist.", ephemeral=False)
+        await interaction.followup.send("🚫 That pool doesn't exist.", ephemeral=True)
         return
 
     # Add funds
@@ -730,14 +731,15 @@ async def lottery_addfunds(interaction: discord.Interaction, pool: Literal["shor
                 new_channel_name = f"{pool} pool: {data['pools'][pool]['amount']:,}"
                 await channel.edit(name=new_channel_name)
             except discord.Forbidden:
-                await interaction.followup.send("⚠️ Couldn't update channel name: missing permissions.", ephemeral=False)
+                await interaction.followup.send("⚠️ Couldn't update channel name: missing permissions.", ephemeral=True)
             except discord.HTTPException as e:
-                await interaction.followup.send(f"⚠️ Failed to update channel: {e}", ephemeral=False)
+                await interaction.followup.send(f"⚠️ Failed to update channel: {e}", ephemeral=True)
 
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"✅ Added **{amount:,}** to the **{pool}** pool. Channel updated and transaction logged.",
         ephemeral=False
     )
+
 
 
 @tree.command(name="banktransfer", description="Transfer bank marks to another verified user.")
