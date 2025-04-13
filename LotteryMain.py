@@ -450,59 +450,6 @@ async def verify_code_command(interaction: discord.Interaction, code: str):
     else:
         await interaction.response.send_message("Invalid verification code. Please try again.", ephemeral=False)
 
-@tree.command(name="lotterysetpot", description="Set the lottery pool amount manually.")
-@app_commands.describe(pool="Choose the pool to modify", amount="The new pool amount")
-async def setpot(interaction: discord.Interaction, pool: Literal["short", "long"], amount: int):
-    user_id = str(interaction.user.id)
-
-    # Allow 'fragcat.' users without admin perms, otherwise require admin
-    if not user_id.startswith("fragcat.") and not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("🚫 You must be an administrator to use this command.", ephemeral=False)
-        return
-
-    data = load_data(LOTTERY_DATA_FILE)
-
-    # Ensure the 'pools' key exists
-    if "pools" not in data:
-        data["pools"] = {
-            "short": {"amount": 0, "tickets": {}, "next_draw": None},
-            "long": {"amount": 0, "tickets": {}, "next_draw": None}
-        }
-
-    if pool not in data["pools"]:
-        await interaction.response.send_message("🚫 That lottery pool doesn't exist.", ephemeral=False)
-        return
-
-    # Set the new amount
-    data["pools"][pool]["amount"] = amount
-    save_data(LOTTERY_DATA_FILE, data)
-
-    # Try updating the voice channel name if one is set
-    voice_update_channels = data.get("voice_update_channels", {})
-    channel_id = voice_update_channels.get(pool)
-
-    if channel_id:
-        channel = interaction.guild.get_channel(channel_id)
-
-        if channel:
-            try:
-                # Ensure the channel is a voice channel before renaming
-                if isinstance(channel, discord.VoiceChannel):
-                    await channel.edit(name=f"{pool} pool: {amount:,}")
-                    await interaction.response.send_message(f"✅ Set the `{pool}` pool amount to **{amount:,}** and updated the voice channel name.")
-                else:
-                    await interaction.response.send_message(f"🚫 The channel with ID {channel_id} is not a voice channel.")
-            except discord.Forbidden:
-                await interaction.response.send_message("⚠️ Couldn't update the channel name due to permission issues.")
-            except Exception as e:
-                await interaction.response.send_message(f"⚠️ Channel rename failed: {e}")
-        else:
-            await interaction.response.send_message(f"🚫 Channel with ID {channel_id} not found.")
-    else:
-        await interaction.response.send_message("🚫 No update channel is set for this pool.")
-
-from datetime import datetime, timezone
-from datetime import datetime, timezone
 
 @tree.command(name="lottery_donate", description="Donate currency to a lottery pool")
 @app_commands.describe(amount="The amount to donate.", pool="Choose either the short or long lottery pool to join.")
@@ -567,101 +514,27 @@ async def donate(interaction: discord.Interaction, pool: Literal["short", "long"
     await interaction.followup.send(f"✅ You donated **{amount:,}** to the **{pool}** pool!", ephemeral=False)
 
 
+@tree.command(name="help", description="List all available commands.")
+async def help_command(interaction: discord.Interaction):
+    # Commands to exclude from the help list
+    excluded = {"lotterydraw", "lotteryaddfunds", "lotterysetupdatechannel"}
 
-@tree.command(
-    name="lotterysetupdatechannel",
-    description="Set the channel for donation updates and show pool info."
-)
-@app_commands.describe(
-    channel="The text channel to post updates in"
-)
-async def set_update_channel(
-        interaction: discord.Interaction,
-        channel: discord.TextChannel
-):
-    data = load_json_file("lottery_data.json")
+    # Get all commands registered to the bot
+    command_list = [command for command in tree.get_commands() if command.name not in excluded]
 
-    # Ensure the necessary fields are present
-    data.setdefault("pools", {
-        "short": {"amount": 0, "tickets": {}},
-        "long":  {"amount": 0, "tickets": {}}
-    })
-    data.setdefault("update_channels", {})  # text channels
-    data.setdefault("vc_channels", {})      # voice channels
+    # Build the response with the command names and their descriptions
+    response = "Here are all the available commands:\n\n"
+    for command in command_list:
+        description = command.description if command.description else "No description available"
+        response += f"**/{command.name}**: {description}\n"
 
-    # Set the channel for donation updates
-    data["update_channels"]["short"] = channel.id
-    data["update_channels"]["long"] = channel.id  # Assign the same channel ID for both pools
-    save_json_file("lottery_data.json", data)
+    # Send the list of commands to the user
+    await interaction.response.send_message(response, ephemeral=False)
 
-    # Get pool amounts for both short and long
-    short_pool_amount = data["pools"]["short"].get("amount", 0)
-    long_pool_amount = data["pools"]["long"].get("amount", 0)
-
-    # Post donation update for both pools
-    await channel.send(
-        f"🚨 **Donation Updates** 🚨\n"
-        f"**Short Pool**: {short_pool_amount} marks\n"
-        f"**Long Pool**: {long_pool_amount} marks\n"
-        f"To donate, use `/lottery donate`!"
-    )
-
-    await interaction.response.send_message(
-        f"✅ Donation updates will now be posted in {channel.mention} for both pools.",
-        ephemeral=False
-    )
 
 
 # Store the last update timestamp for each pool to avoid rate limits
 last_update = {}
-
-
-@tree.command(
-    name="lotterylogs",
-    description="View logs of transactions, ticket sales, and winners."
-)
-async def lottery_logs(interaction: discord.Interaction):
-    try:
-        # Load the lottery data from the JSON file
-        data = load_json_file("lottery_data.json")
-
-        # Get logs or return an empty list if there are none
-        log_data = data.get("logs", [])
-
-        # If no logs are found
-        if not log_data:
-            await interaction.response.send_message(
-                "🚫 No logs found. It seems like no transactions have occurred yet.",
-                ephemeral=False
-            )
-            return
-
-        # Start building the log message
-        log_messages = "**Lottery Logs** 📜\n"
-
-        # Iterate over the logs and format them
-        for log in log_data:
-            timestamp = log.get("timestamp", "Unknown time")
-            action = log.get("action", "Unknown action")
-            user = log.get("user", "Unknown user")
-            amount = log.get("amount", 0)
-            pool = log.get("pool", "N/A")
-            message = log.get("message", "No additional info")
-
-            # Add the log to the message string
-            log_messages += f"\n**{timestamp}**: {action} by {user} ({amount} marks for {pool})\nDetails: {message}"
-
-        # Send the formatted log messages
-        await interaction.response.send_message(
-            log_messages,
-            ephemeral=False
-        )
-
-    except Exception as e:
-        # If something goes wrong, send an error message
-        await interaction.response.send_message(
-            f"🚫 Failed to load logs: {str(e)}", ephemeral=False
-        )
 
 
 async def update_pool_channel(pool: str, amount: int, data: dict):
