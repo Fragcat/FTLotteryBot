@@ -437,7 +437,7 @@ async def verify_code_command(interaction: discord.Interaction, code: str):
         await interaction.response.send_message("Invalid verification code. Please try again.", ephemeral=False)
 
 
-@tree.command(name="lottery_donate", description="Donate currency to a lottery pool")
+@tree.command(name="lotterydonate", description="Donate currency to a lottery pool")
 @app_commands.describe(amount="The amount to donate.", pool="Choose either the short or long lottery pool to join.")
 async def donate(interaction: discord.Interaction, pool: Literal["short", "long"], amount: int):
     await interaction.response.defer(ephemeral=False)
@@ -691,7 +691,7 @@ async def mytickets(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, ephemeral=False)
 
 
-@tree.command(name="lottery_addfunds", description="Admin: Add funds directly to a lottery pool.")
+@tree.command(name="lotteryaddfunds", description="Admin: Add funds directly to a lottery pool.")
 @app_commands.describe(pool="The lottery pool to add funds to (short or long)", amount="Amount of marks to add")
 async def lottery_addfunds(interaction: discord.Interaction, pool: Literal["short", "long"], amount: int):
     # Check if user has the required role by ID
