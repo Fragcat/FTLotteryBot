@@ -395,20 +395,6 @@ async def verify_command(interaction: discord.Interaction, ign: str):
     except mcrcon.MCRconException as e:
         await interaction.response.send_message(f"An error occurred while sending the verification code: {e}",
                                                 ephemeral=False)
-@tree.command(name="help", description="List all available commands.")
-async def help_command(interaction: discord.Interaction):
-    # Get all commands registered to the bot
-    command_list = [command.name for command in tree.get_commands()]
-
-    # Build the response with the command names and their descriptions
-    response = "Here are all the available commands:\n\n"
-    for command in command_list:
-        cmd_obj = tree.get_command(command)  # Get the command object
-        description = cmd_obj.description if cmd_obj.description else "No description available"
-        response += f"**/{command}**: {description}\n"
-
-    # Send the list of commands to the user
-    await interaction.response.send_message(response, ephemeral=False)
 
 
 
