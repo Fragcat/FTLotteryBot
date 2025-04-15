@@ -324,7 +324,7 @@ def generate_verification_code():
     description='Links your discord account to your in-game username and verifies you in our discord server',
 )
 @discord.app_commands.describe(
-    ign="Your username or alderon-ID exactly as it appears in-game. e.g 'ehwzv' or '308-364-016'."
+    ign="Your username (NOT your Alderon-ID) exactly as it appears in-game. e.g 'Fragcatt'."
 )
 async def verify_command(interaction: discord.Interaction, ign: str):
     global verification_code, verification_code_expiration, user_pending_verification, verified_users
@@ -372,7 +372,7 @@ async def verify_command(interaction: discord.Interaction, ign: str):
 
         if "No player" in response:
             await interaction.response.send_message(
-                f"❌ No player with the name `{ign}` is currently online. Please double-check the spelling and try again.",
+                f"❌ No player with the name `{ign}` is currently online. Please ensure your in the game server or double-check the spelling and try again.",
                 ephemeral=False
             )
             return
